@@ -1,3 +1,5 @@
+useDotenv: true
+
 service: product-service
 # app and org for use with dashboard.serverless.com
 #app: your-app-name
@@ -14,6 +16,20 @@ provider:
   stage: dev
   region: eu-west-1
   profile: aws-training
+  environment:
+    DB_PRODUCTS: ${self:custom.dotenvVars.DB_PRODUCTS, env:DB_PRODUCTS, ''}
+    DB_STOCKS: ${self:custom.dotenvVars.DB_STOCKS, env:DB_STOCKS, ''}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:*
+      Resource: '*'
+
+custom:
+  webpack:
+    webpackConfig: "webpack.config.js"
+    includeModules: true
+    dotenvVars: ${file(configs.mjs)}
 
 functions:
   getProductList:
@@ -30,3 +46,13 @@ functions:
           method: get
           path: /products/{productId}
           cors: true
+  createProduct:
+    handler: handler.createProduct
+    events:
+      - http:
+          method: post
+          path: /products
+          cors: true
+          request:
+              schemas:
+                application/json: ${file(src/schemas/createProduct.json)}

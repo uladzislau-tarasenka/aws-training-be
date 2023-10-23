@@ -1,36 +1,59 @@
-import data from '../mockData.json';
+export const getProductByIdHandler = (dbClient) => async (event) => {
+    try {
+        console.log('Incoming event: ', event);
 
-export const getProductById = async (event) => {
-    const { productId } = event.pathParameters;
-    const product = data.find(product => product.id === productId);
+        const { productId } = event.pathParameters;
+        const { Item: product } = await dbClient.get({ TableName: process.env.DB_PRODUCTS, Key: { id: productId } }).promise() || null;
 
-    if (!product) {
+        if (!product) {
+            return {
+                statusCode: 404,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Credentials': true,
+                },
+                body: JSON.stringify(
+                    {
+                        message: 'Product was not found',
+                    },
+                    null,
+                    2
+                ),
+            };
+        }
+
+        const { Items: stocks } = await dbClient.scan({
+            TableName : process.env.DB_STOCKS,
+            FilterExpression: 'product_id = :productId',
+            ExpressionAttributeValues: {
+                ":productId": productId
+            }
+        }).promise() || {};
+
+        const joinProduct = { ...product, count: stocks[0].count };
+
         return {
-            statusCode: 404,
+            statusCode: 200,
             headers: {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Credentials': true,
             },
             body: JSON.stringify(
-                {
-                    message: 'Product was not found',
-                },
+                joinProduct,
                 null,
                 2
             ),
         };
-    }
+    } catch (err) {
+        console.log('Incoming error: ', err);
 
-    return {
-        statusCode: 200,
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': true,
-        },
-        body: JSON.stringify(
-            product,
-            null,
-            2
-        ),
-    };
+        return {
+            statusCode: 500,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Credentials': true,
+            },
+            body: 'Internal Server Error'
+        }
+    }
 };
