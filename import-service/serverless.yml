@@ -18,6 +18,7 @@ provider:
   profile: aws-training
   environment:
     BUCKET: ${self:custom.dotenvVars.BUCKET, env:BUCKET, ''}
+    SQS_URL: ${cf:product-service-dev.sqsUrl}
   iamRoleStatements:
     - Effect: "Allow"
       Action: "s3:ListBucket"
@@ -28,6 +29,10 @@ provider:
         - "s3:*"
       Resource:
         - "arn:aws:s3:::epam-aws-training-import-service-bucket/*"
+    - Effect: "Allow"
+      Action:
+        - "sqs:*"
+      Resource: ${cf:product-service-dev.sqsArn}
 
 custom:
   webpack:
