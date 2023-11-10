@@ -1,24 +1,41 @@
-export const basicAuthorizerHandler = (dbClient) => async (event) => {
+const generatePolicy = (principalId, resource, effect = 'Allow') => {
+    return {
+      principalId,
+      policyDocument: {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Action: 'execute-api:Invoke',
+            Effect: effect,
+            Resource: resource,
+          },
+        ],
+      },
+    };
+  };
+
+export const basicAuthorizerHandler = () => async (event, context, callback) => {
+    console.log('Incoming event: ', event);
+
+    const { token, methodArn, type } = event;
+
+    if (type !== 'TOKEN' || !token) {
+        callback('Unauthorized');
+    }
+
     try {
-        console.log('Incoming event: ', event);
+        const [, encodedCreds] = token.split(' ');
+        const decodedCreds = Buffer.from(encodedCreds, 'base64').toString('utf-8');
+        const [username, password] = decodedCreds.split('=');
+        const expectedPassword = process.env[username];
 
-        return {
-            statusCode: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Credentials': true,
-            }
-        };
-    } catch (err) {
-        console.log('Incoming error: ', err);
+        const effect = !expectedPassword || password !== expectedPassword ? 'Deny' : 'Allow';
+        const policy = generatePolicy(encodedCreds, methodArn, effect);
 
-        return {
-            statusCode: 500,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Credentials': true,
-            },
-            body: 'Internal Server Error'
-        }
+        callback(null, policy);
+    } catch (e) {
+        console.log('Incoming error: ', e);
+
+        callback(`Unauthorized: ${e.message}`);
     }
 };
