@@ -19,11 +19,48 @@ provider:
   environment:
     DB_PRODUCTS: ${self:custom.dotenvVars.DB_PRODUCTS, env:DB_PRODUCTS, ''}
     DB_STOCKS: ${self:custom.dotenvVars.DB_STOCKS, env:DB_STOCKS, ''}
+    SNS_ARN: 
+      Ref: createProductTopic
   iamRoleStatements:
     - Effect: Allow
       Action:
         - dynamodb:*
       Resource: '*'
+    - Effect: Allow
+      Action:
+        - sqs:*
+      Resource:
+        - Fn::GetAtt: [catalogItemsQueue, Arn]
+    - Effect: Allow
+      Action:
+        - sns:*
+      Resource:
+        Ref: createProductTopic
+
+resources:
+  Resources:
+    catalogItemsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: catalog-items-queue
+    createProductTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: create-product-topic
+    createProductTopicSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Endpoint: vlad.fps@gmail.com
+        Protocol: email
+        TopicArn:
+          Ref: createProductTopic
+  Outputs:
+      sqsUrl:
+        Value: !Ref catalogItemsQueue
+      sqsArn:
+        Value:
+          Fn::GetAtt: [catalogItemsQueue, Arn]
+
 
 custom:
   webpack:
@@ -56,3 +93,10 @@ functions:
           request:
               schemas:
                 application/json: ${file(src/schemas/createProduct.json)}
+  catalogBatchProcess:
+    handler: handler.catalogBatchProcess
+    events:
+      - sqs:
+          batchSize: 5
+          arn:
+            Fn::GetAtt: [catalogItemsQueue, Arn]
